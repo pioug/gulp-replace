@@ -3,6 +3,8 @@
 var Transform = require('readable-stream/transform');
 var rs = require('replacestream');
 var istextorbinary = require('istextorbinary');
+var MagicString = require('magic-string');
+var applySourceMap = require('vinyl-sourcemaps-apply');
 
 module.exports = function(search, _replacement, options) {
   if (!options) {
@@ -33,36 +35,38 @@ module.exports = function(search, _replacement, options) {
         }
 
         if (file.isBuffer()) {
+          var magicString = new MagicString(String(file.contents));
           if (search instanceof RegExp) {
-            file.contents = new Buffer(String(file.contents).replace(search, replacement));
+            String(file.contents).replace(search, function(...args) {
+              var match = args[0];
+              var offset = args[args.length - 2];
+              var string = args[args.length - 1];
+              var replaced = typeof replacement === 'function' ? replacement(...args) : match.replace(search, replacement);
+              magicString.overwrite(offset,  offset + match.length, replaced);
+              return replaced;
+            })
+            file.contents = new Buffer(magicString.toString());
           }
           else {
-            var chunks = String(file.contents).split(search);
-
-            var result;
-            if (typeof replacement === 'function') {
-              // Start with the first chunk already in the result
-              // Replacements will be added thereafter
-              // This is done to avoid checking the value of i in the loop
-              result = [ chunks[0] ];
-
-              // The replacement function should be called once for each match
-              for (var i = 1; i < chunks.length; i++) {
-                // Add the replacement value
-                result.push(replacement(search));
-
-                // Add the next chunk
-                result.push(chunks[i]);
-              }
-
-              result = result.join('');
-            }
-            else {
-              result = chunks.join(replacement);
-            }
-
-            file.contents = new Buffer(result);
+            var [chunk1, ...chunks] = String(file.contents).split(search);
+            var offset = chunk1.length;
+            chunks.reduce(function(acc, chunk) {
+              var replaced = typeof replacement === 'function' ? replacement(search) : replacement;
+              magicString.overwrite(offset, offset + search.length, replaced);
+              offset += search.length + chunk.length;
+              return `${acc}${replaced}${chunk}`;
+            }, chunk1);
+            file.contents = new Buffer(magicString.toString());
           }
+
+          if (file.sourceMap) {
+            const map = magicString.generateMap({
+              file: file.basename,
+              source: file.basename
+            });
+            applySourceMap(file, map);
+          }
+
           return callback(null, file);
         }
 

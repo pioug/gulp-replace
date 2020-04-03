@@ -4,8 +4,10 @@
   "description": "A string replace plugin for gulp",
   "dependencies": {
     "istextorbinary": "2.2.1",
+    "magic-string": "0.25.7",
     "readable-stream": "^2.0.1",
-    "replacestream": "^4.0.0"
+    "replacestream": "^4.0.0",
+    "vinyl-sourcemaps-apply": "0.2.1"
   },
   "devDependencies": {
     "concat-stream": "^1.5.2",

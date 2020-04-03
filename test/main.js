@@ -19,6 +19,30 @@ describe('gulp-replace', function() {
       ];
     });
 
+    describe('bandlab input', function () {
+      it('should replace string on a buffer', function(done) {
+        var file = new File({
+          path: 'test/fixtures/bandlab.txt',
+          contents: fs.readFileSync('test/fixtures/bandlab.txt')
+        });
+
+        var check = function (stream, done, cb) {
+          stream.on('data', function (newFile) {
+            cb(newFile);
+            done();
+          });
+
+          stream.write(file);
+          stream.end();
+        };
+
+        var stream = replacePlugin(/common\/workers\/([_a-z0-9-]*\.js)/gi, 'https://www.bandlab.com/web-app/common/workers/$1');
+        check(stream, done, function (newFile) {
+          String(newFile.contents).should.equal(fs.readFileSync('test/expected/bandlab.txt', 'utf8'));
+        });
+      });
+    })
+
     describe('buffered input', function () {
       var file, check;
 
